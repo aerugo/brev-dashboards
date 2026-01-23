@@ -9,6 +9,35 @@ import requests
 import weaviate
 from weaviate.classes.query import MetadataQuery
 
+# Data product definitions
+# Maps product key to collection name, LakeFS path, and display info
+DATA_PRODUCTS = {
+    "full_real": {
+        "label": "Full Real Data",
+        "description": "Complete real speeches dataset",
+        "collection": "CentralBankSpeeches",
+        "lakefs_path": "central-bank-speeches/speeches.parquet",
+    },
+    "full_synthetic": {
+        "label": "Full Synthetic Data",
+        "description": "Privacy-preserving synthetic speeches",
+        "collection": "SyntheticSpeeches",
+        "lakefs_path": "central-bank-speeches/synthetic/speeches.parquet",
+    },
+    "trial_real": {
+        "label": "Trial Real Data",
+        "description": "Sample of real speeches (10 records)",
+        "collection": "CentralBankSpeechesTrial",
+        "lakefs_path": "central-bank-speeches/trial/speeches.parquet",
+    },
+    "trial_synthetic": {
+        "label": "Trial Synthetic Data",
+        "description": "Sample of synthetic speeches (10 records)",
+        "collection": "SyntheticSpeechesTrial",
+        "lakefs_path": "central-bank-speeches/synthetic/trial/speeches.parquet",
+    },
+}
+
 # Weaviate connection settings
 WEAVIATE_HOST = os.getenv("WEAVIATE_HOST", "weaviate.weaviate.svc.cluster.local")
 WEAVIATE_PORT = int(os.getenv("WEAVIATE_PORT", "80"))
@@ -224,3 +253,123 @@ def check_services() -> dict[str, bool]:
         status["lakefs"] = False
 
     return status
+
+
+def get_available_data_products() -> dict[str, dict[str, Any]]:
+    """Detect which data products have been materialized.
+
+    Checks both Weaviate collections and LakeFS paths to determine
+    which data products are available for use.
+
+    Returns:
+        Dictionary of available products with their metadata and record counts.
+    """
+    import lakefs_sdk
+    from lakefs_sdk.client import LakeFSClient
+
+    available = {}
+
+    # Get Weaviate client for collection checks
+    try:
+        weaviate_client = get_weaviate_client()
+        weaviate_available = True
+    except Exception:
+        weaviate_client = None
+        weaviate_available = False
+
+    # Get LakeFS client for path checks
+    try:
+        configuration = lakefs_sdk.Configuration(
+            host=LAKEFS_ENDPOINT,
+            username=LAKEFS_ACCESS_KEY,
+            password=LAKEFS_SECRET_KEY,
+        )
+        lakefs_client = LakeFSClient(configuration)
+        lakefs_available = True
+    except Exception:
+        lakefs_client = None
+        lakefs_available = False
+
+    for product_key, product_info in DATA_PRODUCTS.items():
+        collection_name = product_info["collection"]
+        lakefs_path = product_info["lakefs_path"]
+
+        # Check Weaviate collection
+        weaviate_count = 0
+        weaviate_exists = False
+        if weaviate_available and weaviate_client:
+            try:
+                if weaviate_client.collections.exists(collection_name):
+                    coll = weaviate_client.collections.get(collection_name)
+                    response = coll.aggregate.over_all(total_count=True)
+                    weaviate_count = response.total_count or 0
+                    weaviate_exists = weaviate_count > 0
+            except Exception:
+                pass
+
+        # Check LakeFS path
+        lakefs_exists = False
+        if lakefs_available and lakefs_client:
+            try:
+                lakefs_client.objects_api.stat_object(
+                    repository="data",
+                    ref="main",
+                    path=lakefs_path,
+                )
+                lakefs_exists = True
+            except Exception:
+                pass
+
+        # Product is available if it has data in Weaviate (for search)
+        if weaviate_exists:
+            available[product_key] = {
+                **product_info,
+                "weaviate_count": weaviate_count,
+                "lakefs_exists": lakefs_exists,
+            }
+
+    # Close Weaviate client
+    if weaviate_client:
+        try:
+            weaviate_client.close()
+        except Exception:
+            pass
+
+    return available
+
+
+def load_data_product_by_key(product_key: str) -> pl.DataFrame:
+    """Load a data product by its key.
+
+    Args:
+        product_key: Key from DATA_PRODUCTS (e.g., 'full_real', 'trial_synthetic').
+
+    Returns:
+        Polars DataFrame with speech data.
+
+    Raises:
+        ValueError: If product_key is not valid.
+        Exception: If data product cannot be loaded.
+    """
+    if product_key not in DATA_PRODUCTS:
+        raise ValueError(f"Unknown data product: {product_key}")
+
+    import lakefs_sdk
+    from lakefs_sdk.client import LakeFSClient
+
+    configuration = lakefs_sdk.Configuration(
+        host=LAKEFS_ENDPOINT,
+        username=LAKEFS_ACCESS_KEY,
+        password=LAKEFS_SECRET_KEY,
+    )
+
+    client = LakeFSClient(configuration)
+    path = DATA_PRODUCTS[product_key]["lakefs_path"]
+
+    response = client.objects_api.get_object(
+        repository="data",
+        ref="main",
+        path=path,
+    )
+
+    return pl.read_parquet(io.BytesIO(response.read()))

@@ -1,7 +1,8 @@
 """Central Bank Speeches Vector Search Dashboard.
 
 Interactive dashboard for exploring central bank speeches using semantic search.
-Supports switching between real and synthetic (privacy-preserving) data products.
+Supports multiple data products: full/trial versions of real and synthetic data.
+Only shows data products that have been materialized by the Dagster pipeline.
 
 Run with: marimo run dashboard.py
 Edit with: marimo edit dashboard.py
@@ -27,12 +28,13 @@ def __(mo):
         # Central Bank Speeches Explorer
 
         Search through thousands of central bank speeches using AI-powered semantic search.
-        Toggle between real and synthetic (privacy-preserving) data products.
+        Choose from available data products including full and trial versions of real
+        and synthetic (privacy-preserving) data.
 
         **Features:**
         - Vector similarity search using local NIM embedding model
-        - Real-time search across ~10K central bank speeches
-        - Toggle between real and synthetic data collections
+        - Multiple data sources: full/trial real and synthetic datasets
+        - Only shows data products that have been materialized
         - Tariff mention classification via NIM LLM
         """
     )
@@ -42,20 +44,24 @@ def __(mo):
 @app.cell
 def __():
     from utils import (
+        DATA_PRODUCTS,
         check_services,
+        get_available_data_products,
         get_collection_stats,
         get_sample_queries,
-        load_data_product,
+        load_data_product_by_key,
         vector_search,
     )
 
     import polars as pl
 
     return (
+        DATA_PRODUCTS,
         check_services,
+        get_available_data_products,
         get_collection_stats,
         get_sample_queries,
-        load_data_product,
+        load_data_product_by_key,
         pl,
         vector_search,
     )
@@ -89,35 +95,69 @@ def __(mo):
 
 
 @app.cell
-def __(mo):
-    use_synthetic = mo.ui.switch(label="Use Synthetic Data", value=False)
-    use_synthetic
-    return (use_synthetic,)
+def __(get_available_data_products, mo):
+    # Detect which data products have been materialized
+    available_products = get_available_data_products()
+
+    if not available_products:
+        mo.callout(
+            "No data products found. Run the Dagster pipeline first to index speeches.",
+            kind="danger",
+        )
+        data_source = None
+    else:
+        # Create dropdown options from available products
+        dropdown_options = {
+            f"{info['label']} ({info['weaviate_count']:,} speeches)": key
+            for key, info in available_products.items()
+        }
+
+        # Default to first available option
+        default_key = list(dropdown_options.values())[0]
+
+        data_source = mo.ui.dropdown(
+            options=dropdown_options,
+            value=default_key,
+            label="Select Data Source",
+        )
+        data_source
+
+    return available_products, data_source
 
 
 @app.cell
-def __(use_synthetic):
-    collection = "SyntheticSpeeches" if use_synthetic.value else "CentralBankSpeeches"
-    return (collection,)
+def __(available_products, data_source):
+    # Get collection name from selected data source
+    if data_source is not None and data_source.value:
+        selected_product = available_products.get(data_source.value, {})
+        collection = selected_product.get("collection", "CentralBankSpeeches")
+        selected_product_key = data_source.value
+    else:
+        collection = None
+        selected_product_key = None
+    return collection, selected_product, selected_product_key
 
 
 @app.cell
-def __(collection, get_collection_stats, mo):
-    stats = get_collection_stats(collection)
+def __(available_products, collection, data_source, mo):
+    if data_source is None or collection is None:
+        mo.md("_No data source selected._")
+    else:
+        product_info = available_products.get(data_source.value, {})
+        lakefs_status = "Available" if product_info.get("lakefs_exists") else "Not in LakeFS"
 
-    if stats["exists"]:
         mo.md(
             f"""
             **Active Collection**: `{collection}`
-            **Total Speeches**: {stats['count']:,}
+
+            **Total Speeches**: {product_info.get('weaviate_count', 0):,}
+
+            **Description**: {product_info.get('description', 'N/A')}
+
+            **LakeFS Data**: {lakefs_status}
             """
         )
-    else:
-        mo.callout(
-            f"Collection '{collection}' not found. Run the Dagster pipeline first to index speeches.",
-            kind="danger",
-        )
-    return (stats,)
+    return (product_info,)
 
 
 @app.cell
@@ -226,32 +266,44 @@ def __(mo):
 
 
 @app.cell
-def __(load_data_product, mo, pl, use_synthetic):
-    try:
-        df = load_data_product(use_synthetic=use_synthetic.value)
+def __(load_data_product_by_key, mo, pl, product_info, selected_product_key):
+    df = None
+    summary_data = None
 
-        # Summary statistics
-        summary_data = {
-            "Metric": [
-                "Total Speeches",
-                "Central Banks",
-                "Speakers",
-                "Tariff Mentions",
-                "Date Range",
-            ],
-            "Value": [
-                str(len(df)),
-                str(df["central_bank"].n_unique()),
-                str(df["speaker"].n_unique()) if "speaker" in df.columns else "N/A",
-                str(df.filter(pl.col("tariff_mention") == 1).height),
-                f"{df['date'].min()} to {df['date'].max()}" if "date" in df.columns else "N/A",
-            ],
-        }
+    if selected_product_key is None:
+        mo.md("_Select a data source to view statistics._")
+    elif not product_info.get("lakefs_exists"):
+        mo.callout(
+            f"Data product '{product_info.get('label')}' is indexed in Weaviate but not available in LakeFS. "
+            "Statistics are unavailable.",
+            kind="warn",
+        )
+    else:
+        try:
+            df = load_data_product_by_key(selected_product_key)
 
-        mo.ui.table(pl.DataFrame(summary_data).to_pandas(), selection=None)
-    except Exception as e:
-        mo.callout(f"Could not load data product: {e}", kind="warn")
-        df = None
+            # Summary statistics
+            summary_data = {
+                "Metric": [
+                    "Total Speeches",
+                    "Central Banks",
+                    "Speakers",
+                    "Tariff Mentions",
+                    "Date Range",
+                ],
+                "Value": [
+                    str(len(df)),
+                    str(df["central_bank"].n_unique()),
+                    str(df["speaker"].n_unique()) if "speaker" in df.columns else "N/A",
+                    str(df.filter(pl.col("tariff_mention") == 1).height),
+                    f"{df['date'].min()} to {df['date'].max()}" if "date" in df.columns else "N/A",
+                ],
+            }
+
+            mo.ui.table(pl.DataFrame(summary_data).to_pandas(), selection=None)
+        except Exception as e:
+            mo.callout(f"Could not load data product: {e}", kind="warn")
+
     return df, summary_data
 
 
