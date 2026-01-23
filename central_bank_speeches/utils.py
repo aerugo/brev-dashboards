@@ -11,7 +11,8 @@ from weaviate.classes.query import MetadataQuery
 
 # Weaviate connection settings
 WEAVIATE_HOST = os.getenv("WEAVIATE_HOST", "weaviate.weaviate.svc.cluster.local")
-WEAVIATE_PORT = int(os.getenv("WEAVIATE_PORT", "8080"))
+WEAVIATE_PORT = int(os.getenv("WEAVIATE_PORT", "80"))
+WEAVIATE_GRPC_HOST = os.getenv("WEAVIATE_GRPC_HOST", "weaviate-grpc.weaviate.svc.cluster.local")
 WEAVIATE_GRPC_PORT = int(os.getenv("WEAVIATE_GRPC_PORT", "50051"))
 
 # NIM Embedding settings
@@ -33,7 +34,7 @@ def get_weaviate_client() -> weaviate.WeaviateClient:
         http_host=WEAVIATE_HOST,
         http_port=WEAVIATE_PORT,
         http_secure=False,
-        grpc_host=WEAVIATE_HOST,
+        grpc_host=WEAVIATE_GRPC_HOST,
         grpc_port=WEAVIATE_GRPC_PORT,
         grpc_secure=False,
     )
