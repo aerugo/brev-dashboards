@@ -130,36 +130,29 @@ def __(mo):
 def __(get_sample_queries, mo):
     sample_queries = get_sample_queries()
 
-    # Create form elements
-    query_input = mo.ui.text_area(
-        label="Search Query",
-        placeholder="Enter your search query (e.g., 'inflation expectations')...",
-        value=sample_queries[0],
-        full_width=True,
-    )
-
-    num_results_input = mo.ui.slider(
-        label="Number of Results",
-        start=5,
-        stop=50,
-        value=10,
-        step=5,
-    )
-
-    # Create a form that submits on button click
+    # Create form with dictionary of elements
     search_form = mo.ui.form(
-        mo.md(f"""
-{query_input}
-
-{num_results_input}
-
-_Sample queries: {', '.join(sample_queries[:5])}..._
-        """),
+        {
+            "query": mo.ui.text_area(
+                label="Search Query",
+                placeholder="Enter your search query (e.g., 'inflation expectations')...",
+                value=sample_queries[0],
+                full_width=True,
+            ),
+            "num_results": mo.ui.slider(
+                label="Number of Results",
+                start=5,
+                stop=50,
+                value=10,
+                step=5,
+            ),
+        },
         submit_button_label="Search",
     )
 
+    mo.md(f"_Sample queries: {', '.join(sample_queries[:5])}..._")
     search_form
-    return query_input, num_results_input, sample_queries, search_form
+    return sample_queries, search_form
 
 
 @app.cell
@@ -170,19 +163,19 @@ def __(mo):
 
 
 @app.cell
-def __(collection, mo, num_results_input, query_input, search_form, vector_search):
+def __(collection, mo, search_form, vector_search):
     results = []
 
     if search_form.value is None:
         mo.md("_Enter a query and click 'Search' to find speeches._")
-    elif not query_input.value.strip():
+    elif not search_form.value["query"].strip():
         mo.callout("Please enter a search query.", kind="info")
     else:
         try:
             results = vector_search(
-                query=query_input.value,
+                query=search_form.value["query"],
                 collection=collection,
-                limit=num_results_input.value,
+                limit=search_form.value["num_results"],
             )
             mo.md(f"### Results ({len(results)} found)")
         except Exception as e:
