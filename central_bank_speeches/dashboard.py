@@ -166,11 +166,12 @@ def __(mo):
 
 @app.cell
 def __(collection, mo, num_results, query, search_btn, vector_search):
+    results = []  # Initialize before mo.stop to avoid NameError
+
     mo.stop(not search_btn.value)
 
     if not query.value.strip():
         mo.callout("Please enter a search query.", kind="info")
-        results = []
     else:
         try:
             results = vector_search(
@@ -181,7 +182,6 @@ def __(collection, mo, num_results, query, search_btn, vector_search):
             mo.md(f"### Results ({len(results)} found)")
         except Exception as e:
             mo.callout(f"Search error: {e}", kind="danger")
-            results = []
     return (results,)
 
 
