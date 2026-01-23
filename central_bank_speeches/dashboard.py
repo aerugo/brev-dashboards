@@ -130,54 +130,59 @@ def __(mo):
 def __(get_sample_queries, mo):
     sample_queries = get_sample_queries()
 
-    query = mo.ui.text_area(
+    # Create form elements
+    query_input = mo.ui.text_area(
         label="Search Query",
         placeholder="Enter your search query (e.g., 'inflation expectations')...",
         value=sample_queries[0],
         full_width=True,
     )
 
-    mo.md(f"_Sample queries: {', '.join(sample_queries[:5])}..._")
-    query
-    return query, sample_queries
-
-
-@app.cell
-def __(mo):
-    num_results = mo.ui.slider(
+    num_results_input = mo.ui.slider(
         label="Number of Results",
         start=5,
         stop=50,
         value=10,
         step=5,
     )
-    show_text = mo.ui.switch(label="Show Text Preview", value=False)
 
-    mo.hstack([num_results, show_text], justify="start", gap=2)
-    return num_results, show_text
+    # Create a form that submits on button click
+    search_form = mo.ui.form(
+        mo.md(f"""
+{query_input}
+
+{num_results_input}
+
+_Sample queries: {', '.join(sample_queries[:5])}..._
+        """),
+        submit_button_label="Search",
+    )
+
+    search_form
+    return query_input, num_results_input, sample_queries, search_form
 
 
 @app.cell
 def __(mo):
-    search_btn = mo.ui.run_button(label="Search")
-    search_btn
-    return (search_btn,)
+    show_text = mo.ui.switch(label="Show Text Preview", value=False)
+    show_text
+    return (show_text,)
 
 
 @app.cell
-def __(collection, mo, num_results, query, search_btn, vector_search):
-    results = []  # Initialize before mo.stop to avoid NameError
+def __(collection, mo, num_results_input, query_input, search_form, vector_search):
+    results = []
 
-    mo.stop(not search_btn.value)
-
-    if not query.value.strip():
+    if search_form.value is None:
+        mo.md("_Enter a query and click 'Search' to find speeches._")
+    elif not query_input.value.strip():
         mo.callout("Please enter a search query.", kind="info")
     else:
         try:
             results = vector_search(
-                query=query.value,
+                query=query_input.value,
                 collection=collection,
-                limit=num_results.value,
+                limit=num_results_input.value,
             )
             mo.md(f"### Results ({len(results)} found)")
         except Exception as e:
@@ -187,9 +192,8 @@ def __(collection, mo, num_results, query, search_btn, vector_search):
 
 @app.cell
 def __(mo, results, show_text):
-    if not results:
-        mo.md("_Click 'Search' to find speeches._")
-    else:
+    output_parts = []
+    if results:
         for i, result in enumerate(results, 1):
             similarity = result.get("_similarity", 0) * 100
 
@@ -208,9 +212,11 @@ def __(mo, results, show_text):
                 text = (result.get("text", "") or "")[:500]
                 card_content += f"\n**Text Preview:**\n\n_{text}..._"
 
-            mo.md(card_content)
-            mo.md("---")
-    return card_content, i, result, similarity, text
+            output_parts.append(card_content)
+            output_parts.append("---")
+
+        mo.md("\n".join(output_parts))
+    return (output_parts,)
 
 
 @app.cell
