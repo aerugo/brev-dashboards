@@ -112,12 +112,12 @@ def __(get_available_data_products, mo):
             for key, info in available_products.items()
         }
 
-        # Default to first available option
-        default_key = list(dropdown_options.values())[0]
+        # Default to first available option (use label, not key)
+        default_label = list(dropdown_options.keys())[0]
 
         data_source = mo.ui.dropdown(
             options=dropdown_options,
-            value=default_key,
+            value=default_label,
             label="Select Data Source",
         )
         data_source
