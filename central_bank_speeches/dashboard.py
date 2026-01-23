@@ -130,24 +130,31 @@ def __(mo):
 def __(get_sample_queries, mo):
     sample_queries = get_sample_queries()
 
-    # Create form with dictionary of elements
-    search_form = mo.ui.form(
-        {
-            "query": mo.ui.text_area(
-                label="Search Query",
+    # Create form using batch().form() pattern
+    search_form = (
+        mo.md(
+            """
+            **Search Query**
+
+            {query}
+
+            **Number of Results:** {num_results}
+            """
+        )
+        .batch(
+            query=mo.ui.text_area(
                 placeholder="Enter your search query (e.g., 'inflation expectations')...",
                 value=sample_queries[0],
                 full_width=True,
             ),
-            "num_results": mo.ui.slider(
-                label="Number of Results",
+            num_results=mo.ui.slider(
                 start=5,
                 stop=50,
                 value=10,
                 step=5,
             ),
-        },
-        submit_button_label="Search",
+        )
+        .form(submit_button_label="Search")
     )
 
     mo.md(f"_Sample queries: {', '.join(sample_queries[:5])}..._")
