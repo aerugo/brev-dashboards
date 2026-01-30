@@ -134,7 +134,7 @@ def vector_search(
             item["_certainty"] = obj.metadata.certainty
             # Convert distance to similarity (cosine distance: 0 = identical)
             item["_similarity"] = 1 - (obj.metadata.distance or 0)
-            output.append(item)
+            output.append(normalize_columns(item))
 
         return output
     finally:
@@ -202,7 +202,35 @@ def load_data_product(use_synthetic: bool = False) -> pl.DataFrame:
         path=path,
     )
 
-    return pl.read_parquet(io.BytesIO(response.read()))
+    return normalize_columns(pl.read_parquet(io.BytesIO(response.read())))
+
+
+def normalize_columns(data: dict[str, Any] | pl.DataFrame) -> dict[str, Any] | pl.DataFrame:
+    """Normalize column names across real and synthetic data products.
+
+    Real Weaviate schema uses: central_bank, speaker, is_governor
+    Synthetic schema uses: country, author, is_gov
+    Enriched parquet uses: country, author, is_gov
+
+    This function maps everything to a canonical set:
+    central_bank/country -> country, speaker/author -> author, is_governor/is_gov -> is_gov
+    """
+    RENAMES = {
+        "central_bank": "country",
+        "speaker": "author",
+        "is_governor": "is_gov",
+    }
+    if isinstance(data, pl.DataFrame):
+        rename_map = {old: new for old, new in RENAMES.items() if old in data.columns and new not in data.columns}
+        if rename_map:
+            data = data.rename(rename_map)
+        return data
+    if isinstance(data, dict):
+        for old, new in RENAMES.items():
+            if old in data and new not in data:
+                data[new] = data.pop(old)
+        return data
+    return data
 
 
 def get_sample_queries() -> list[str]:
@@ -372,4 +400,4 @@ def load_data_product_by_key(product_key: str) -> pl.DataFrame:
         path=path,
     )
 
-    return pl.read_parquet(io.BytesIO(response.read()))
+    return normalize_columns(pl.read_parquet(io.BytesIO(response.read())))

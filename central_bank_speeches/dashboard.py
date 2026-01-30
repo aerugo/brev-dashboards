@@ -242,14 +242,14 @@ def __(mo, results, show_text):
 
 | Field | Value |
 |-------|-------|
-| Central Bank | {result.get('central_bank', 'Unknown')} |
-| Speaker | {result.get('speaker', 'Unknown')} |
+| Country | {result.get('country', 'Unknown')} |
+| Author | {result.get('author', 'Unknown')} |
 | Date | {result.get('date', 'Unknown')} |
 | Tariff Mention | {'Yes' if result.get('tariff_mention') else 'No'} |
 | Similarity | {similarity:.1f}% |
 """
             if show_text.value:
-                text = (result.get("text", "") or "")[:500]
+                text = (result.get("text") or result.get("summary") or "")[:500]
                 card_content += f"\n**Text Preview:**\n\n_{text}..._"
 
             output_parts.append(card_content)
@@ -282,20 +282,20 @@ def __(load_data_product_by_key, mo, pl, product_info, selected_product_key):
         try:
             df = load_data_product_by_key(selected_product_key)
 
-            # Summary statistics
+            # Summary statistics (columns normalized to country/author/is_gov)
             summary_data = {
                 "Metric": [
                     "Total Speeches",
-                    "Central Banks",
-                    "Speakers",
+                    "Countries",
+                    "Authors",
                     "Tariff Mentions",
                     "Date Range",
                 ],
                 "Value": [
                     str(len(df)),
-                    str(df["central_bank"].n_unique()),
-                    str(df["speaker"].n_unique()) if "speaker" in df.columns else "N/A",
-                    str(df.filter(pl.col("tariff_mention") == 1).height),
+                    str(df["country"].n_unique()) if "country" in df.columns else "N/A",
+                    str(df["author"].n_unique()) if "author" in df.columns else "N/A",
+                    str(df.filter(pl.col("tariff_mention") == 1).height) if "tariff_mention" in df.columns else "N/A",
                     f"{df['date'].min()} to {df['date'].max()}" if "date" in df.columns else "N/A",
                 ],
             }
@@ -309,11 +309,11 @@ def __(load_data_product_by_key, mo, pl, product_info, selected_product_key):
 
 @app.cell
 def __(df, mo, pl):
-    if df is not None:
-        mo.md("### Central Banks by Speech Count")
+    if df is not None and "country" in df.columns:
+        mo.md("### Countries by Speech Count")
 
         bank_counts = (
-            df.group_by("central_bank")
+            df.group_by("country")
             .agg(pl.count().alias("count"))
             .sort("count", descending=True)
             .head(15)
