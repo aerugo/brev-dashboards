@@ -132,6 +132,24 @@ def _(df, mo):
 
 
 @app.cell
+def _(mo):
+    mo.md(
+        """
+        ### Classification Scale Legend
+
+        | Score | Monetary Stance | Trade Stance | Economic Outlook |
+        |:-----:|:----------------|:-------------|:-----------------|
+        | 1 | Very Dovish | Very Protectionist | Very Negative |
+        | 2 | Somewhat Dovish | Somewhat Protectionist | Somewhat Negative |
+        | 3 | Neutral | Neutral | Neutral |
+        | 4 | Somewhat Hawkish | Somewhat Globalist | Somewhat Positive |
+        | 5 | Very Hawkish | Very Globalist | Very Positive |
+        """
+    )
+    return
+
+
+@app.cell
 def _(country_filter, df, mo, pl, year_slider):
     import altair as alt
 
