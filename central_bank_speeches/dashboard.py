@@ -10,19 +10,19 @@ Edit with: marimo edit dashboard.py
 
 import marimo
 
-__generated_with = "0.9.0"
+__generated_with = "0.19.5"
 app = marimo.App(width="medium")
 
 
 @app.cell
-def __():
+def _():
     import marimo as mo
 
     return (mo,)
 
 
 @app.cell
-def __(mo):
+def _(mo):
     mo.md(
         """
         # Central Bank Speeches Explorer
@@ -42,7 +42,7 @@ def __(mo):
 
 
 @app.cell
-def __():
+def _():
     from utils import (
         DATA_PRODUCTS,
         check_services,
@@ -68,35 +68,27 @@ def __():
 
 
 @app.cell
-def __(check_services, mo):
-    # Check service availability
+def _(check_services, mo):
     services = check_services()
 
-    service_status = []
-    for name, available in services.items():
-        icon = "+" if available else "x"
-        status = "Available" if available else "Unavailable"
-        service_status.append(f"[{icon}] {name}: {status}")
+    _service_status = []
+    for _name, _available in services.items():
+        _icon = "+" if _available else "x"
+        _status = "Available" if _available else "Unavailable"
+        _service_status.append(f"[{_icon}] {_name}: {_status}")
 
     if all(services.values()):
         mo.md("**Services Status:** All services connected")
     else:
         mo.callout(
-            "\n".join(service_status),
+            "\n".join(_service_status),
             kind="warn" if any(services.values()) else "danger",
         )
-    return name, service_status, services, available, icon, status
+    return (services,)
 
 
 @app.cell
-def __(mo):
-    mo.md("## Data Source")
-    return
-
-
-@app.cell
-def __(get_available_data_products, mo):
-    # Detect which data products have been materialized
+def _(get_available_data_products, mo):
     available_products = get_available_data_products()
 
     if not available_products:
@@ -106,18 +98,16 @@ def __(get_available_data_products, mo):
         )
         data_source = None
     else:
-        # Create dropdown options from available products
-        dropdown_options = {
+        _dropdown_options = {
             f"{info['label']} ({info['weaviate_count']:,} speeches)": key
             for key, info in available_products.items()
         }
 
-        # Default to first available option (use label, not key)
-        default_label = list(dropdown_options.keys())[0]
+        _default_label = list(_dropdown_options.keys())[0]
 
         data_source = mo.ui.dropdown(
-            options=dropdown_options,
-            value=default_label,
+            options=_dropdown_options,
+            value=_default_label,
             label="Select Data Source",
         )
         data_source
@@ -126,8 +116,7 @@ def __(get_available_data_products, mo):
 
 
 @app.cell
-def __(available_products, data_source):
-    # Get collection name from selected data source
+def _(available_products, data_source):
     if data_source is not None and data_source.value:
         selected_product = available_products.get(data_source.value, {})
         collection = selected_product.get("collection", "CentralBankSpeeches")
@@ -135,42 +124,36 @@ def __(available_products, data_source):
     else:
         collection = None
         selected_product_key = None
+        selected_product = {}
     return collection, selected_product, selected_product_key
 
 
 @app.cell
-def __(available_products, collection, data_source, mo):
+def _(available_products, collection, data_source, mo):
     if data_source is None or collection is None:
         mo.md("_No data source selected._")
     else:
-        product_info = available_products.get(data_source.value, {})
-        lakefs_status = "Available" if product_info.get("lakefs_exists") else "Not in LakeFS"
+        _product_info = available_products.get(data_source.value, {})
+        _lakefs_status = "Available" if _product_info.get("lakefs_exists") else "Not in LakeFS"
 
         mo.md(
             f"""
             **Active Collection**: `{collection}`
 
-            **Total Speeches**: {product_info.get('weaviate_count', 0):,}
+            **Total Speeches**: {_product_info.get('weaviate_count', 0):,}
 
-            **Description**: {product_info.get('description', 'N/A')}
+            **Description**: {_product_info.get('description', 'N/A')}
 
-            **LakeFS Data**: {lakefs_status}
+            **LakeFS Data**: {_lakefs_status}
             """
         )
-    return (product_info,)
-
-
-@app.cell
-def __(mo):
-    mo.md("## Search")
     return
 
 
 @app.cell
-def __(get_sample_queries, mo):
-    sample_queries = get_sample_queries()
+def _(get_sample_queries, mo):
+    _sample_queries = get_sample_queries()
 
-    # Create form using batch().form() pattern
     search_form = (
         mo.md(
             """
@@ -184,7 +167,7 @@ def __(get_sample_queries, mo):
         .batch(
             query=mo.ui.text_area(
                 placeholder="Enter your search query (e.g., 'inflation expectations')...",
-                value=sample_queries[0],
+                value=_sample_queries[0],
                 full_width=True,
             ),
             num_results=mo.ui.slider(
@@ -197,20 +180,22 @@ def __(get_sample_queries, mo):
         .form(submit_button_label="Search")
     )
 
-    mo.md(f"_Sample queries: {', '.join(sample_queries[:5])}..._")
-    search_form
-    return sample_queries, search_form
+    mo.vstack([
+        mo.md(f"_Sample queries: {', '.join(_sample_queries[:5])}..._"),
+        search_form,
+    ])
+    return (search_form,)
 
 
 @app.cell
-def __(mo):
+def _(mo):
     show_text = mo.ui.switch(label="Show Text Preview", value=False)
     show_text
     return (show_text,)
 
 
 @app.cell
-def __(collection, mo, search_form, vector_search):
+def _(collection, mo, search_form, vector_search):
     results = []
 
     if search_form.value is None:
@@ -231,50 +216,49 @@ def __(collection, mo, search_form, vector_search):
 
 
 @app.cell
-def __(mo, results, show_text):
-    output_parts = []
+def _(mo, results, show_text):
+    _output_parts = []
     if results:
-        for i, result in enumerate(results, 1):
-            similarity = result.get("_similarity", 0) * 100
+        for _i, _result in enumerate(results, 1):
+            _similarity = _result.get("_similarity", 0) * 100
 
-            card_content = f"""
-**{i}. {result.get('title', 'Untitled')}**
+            _card_content = f"""
+**{_i}. {_result.get('title', 'Untitled')}**
 
 | Field | Value |
 |-------|-------|
-| Country | {result.get('country', 'Unknown')} |
-| Author | {result.get('author', 'Unknown')} |
-| Date | {result.get('date', 'Unknown')} |
-| Tariff Mention | {'Yes' if result.get('tariff_mention') else 'No'} |
-| Similarity | {similarity:.1f}% |
+| Country | {_result.get('country', 'Unknown')} |
+| Author | {_result.get('author', 'Unknown')} |
+| Date | {_result.get('date', 'Unknown')} |
+| Tariff Mention | {'Yes' if _result.get('tariff_mention') else 'No'} |
+| Similarity | {_similarity:.1f}% |
 """
             if show_text.value:
-                text = (result.get("text") or result.get("summary") or "")[:500]
-                card_content += f"\n**Text Preview:**\n\n_{text}..._"
+                _text = (_result.get("text") or _result.get("summary") or "")[:500]
+                _card_content += f"\n**Text Preview:**\n\n_{_text}..._"
 
-            output_parts.append(card_content)
-            output_parts.append("---")
+            _output_parts.append(_card_content)
+            _output_parts.append("---")
 
-        mo.md("\n".join(output_parts))
-    return (output_parts,)
+        mo.md("\n".join(_output_parts))
+    return
 
 
 @app.cell
-def __(mo):
+def _(mo):
     mo.md("## Data Product Overview")
     return
 
 
 @app.cell
-def __(load_data_product_by_key, mo, pl, product_info, selected_product_key):
+def _(load_data_product_by_key, mo, pl, selected_product, selected_product_key):
     df = None
-    summary_data = None
 
     if selected_product_key is None:
         mo.md("_Select a data source to view statistics._")
-    elif not product_info.get("lakefs_exists"):
+    elif not selected_product.get("lakefs_exists"):
         mo.callout(
-            f"Data product '{product_info.get('label')}' is indexed in Weaviate but not available in LakeFS. "
+            f"Data product '{selected_product.get('label')}' is indexed in Weaviate but not available in LakeFS. "
             "Statistics are unavailable.",
             kind="warn",
         )
@@ -282,8 +266,7 @@ def __(load_data_product_by_key, mo, pl, product_info, selected_product_key):
         try:
             df = load_data_product_by_key(selected_product_key)
 
-            # Summary statistics (columns normalized to country/author/is_gov)
-            summary_data = {
+            _summary_data = {
                 "Metric": [
                     "Total Speeches",
                     "Countries",
@@ -300,31 +283,31 @@ def __(load_data_product_by_key, mo, pl, product_info, selected_product_key):
                 ],
             }
 
-            mo.ui.table(pl.DataFrame(summary_data).to_pandas(), selection=None)
+            mo.ui.table(pl.DataFrame(_summary_data).to_pandas(), selection=None)
         except Exception as e:
             mo.callout(f"Could not load data product: {e}", kind="warn")
 
-    return df, summary_data
+    return (df,)
 
 
 @app.cell
-def __(df, mo, pl):
+def _(df, mo, pl):
     if df is not None and "country" in df.columns:
         mo.md("### Countries by Speech Count")
 
-        bank_counts = (
+        _bank_counts = (
             df.group_by("country")
             .agg(pl.count().alias("count"))
             .sort("count", descending=True)
             .head(15)
         )
 
-        mo.ui.table(bank_counts.to_pandas(), selection=None)
-    return (bank_counts,)
+        mo.ui.table(_bank_counts.to_pandas(), selection=None)
+    return
 
 
 @app.cell
-def __(mo):
+def _(mo):
     mo.md(
         """
         ---
