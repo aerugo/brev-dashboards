@@ -104,6 +104,22 @@ def _(dataset_dropdown, load_dataset, mo, pl):
 
 
 @app.cell
+def _(df, mo, pl):
+    _dates = df.with_columns(pl.col("date").cast(pl.Date)).get_column("date")
+    _min_year = _dates.min().year
+    _max_year = _dates.max().year
+
+    year_slider = mo.ui.range_slider(
+        start=_min_year,
+        stop=_max_year,
+        value=[max(_min_year, 1990), _max_year],
+        label="Year Range",
+    )
+    year_slider
+    return (year_slider,)
+
+
+@app.cell
 def _(df, mo):
     _countries = sorted(df["country"].unique().to_list()) if "country" in df.columns else []
 
@@ -116,10 +132,18 @@ def _(df, mo):
 
 
 @app.cell
-def _(country_filter, df, mo, pl):
+def _(country_filter, df, mo, pl, year_slider):
     import altair as alt
 
     _df = df
+
+    # Apply year filter
+    _df = _df.with_columns(pl.col("date").cast(pl.Date).alias("_date"))
+    _df = _df.filter(
+        (pl.col("_date").dt.year() >= year_slider.value[0])
+        & (pl.col("_date").dt.year() <= year_slider.value[1])
+    )
+
     if country_filter.value:
         _df = _df.filter(pl.col("country").is_in(country_filter.value))
 
@@ -130,8 +154,7 @@ def _(country_filter, df, mo, pl):
         mo.md("_Required columns (date, monetary_stance, trade_stance, economic_outlook) not found._"),
     )
 
-    # Parse date and extract month
-    _df = _df.with_columns(pl.col("date").cast(pl.Date).alias("_date"))
+    # Extract month (date already cast to _date above)
     _df = _df.with_columns(pl.col("_date").dt.truncate("1mo").alias("month"))
 
     # Cast stance columns to float for averaging
