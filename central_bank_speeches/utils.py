@@ -16,7 +16,7 @@ DATA_PRODUCTS = {
         "label": "Full Real Data",
         "description": "Complete real speeches dataset",
         "collection": "CentralBankSpeeches",
-        "lakefs_path": "central-bank-speeches/speeches.parquet",
+        "lakefs_path": "central-bank-speeches/enriched_speeches.parquet",
     },
     "full_synthetic": {
         "label": "Full Synthetic Data",
@@ -28,7 +28,7 @@ DATA_PRODUCTS = {
         "label": "Trial Real Data",
         "description": "Sample of real speeches (10 records)",
         "collection": "CentralBankSpeechesTrial",
-        "lakefs_path": "central-bank-speeches/trial/speeches.parquet",
+        "lakefs_path": "central-bank-speeches/trial/enriched_speeches.parquet",
     },
     "trial_synthetic": {
         "label": "Trial Synthetic Data",

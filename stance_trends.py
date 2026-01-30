@@ -41,22 +41,37 @@ def _():
 
 @app.cell
 def _(io, mo, objects_api, pl):
-    _DATASETS = {
-        "Real": "central-bank-speeches/speeches.parquet",
+    _ALL_DATASETS = {
+        "Real": "central-bank-speeches/enriched_speeches.parquet",
         "Synthetic": "central-bank-speeches/synthetic/speeches.parquet",
     }
 
-    dataset_dropdown = mo.ui.dropdown(
-        options=list(_DATASETS.keys()),
-        value="Real",
-        label="Dataset",
-    )
+    # Only offer datasets that exist in LakeFS
+    _available = {}
+    for _name, _path in _ALL_DATASETS.items():
+        try:
+            objects_api.stat_object(repository="data", ref="main", path=_path)
+            _available[_name] = _path
+        except Exception:
+            pass
+
+    DATASETS = _available
+
+    if not DATASETS:
+        dataset_dropdown = None
+        mo.callout("No datasets found in LakeFS.", kind="danger")
+    else:
+        dataset_dropdown = mo.ui.dropdown(
+            options=list(DATASETS.keys()),
+            value=list(DATASETS.keys())[0],
+            label="Dataset",
+        )
+        dataset_dropdown
 
     def _load(name):
-        _path = _DATASETS[name]
+        _path = DATASETS[name]
         _resp = objects_api.get_object(repository="data", ref="main", path=_path)
         _df = pl.read_parquet(io.BytesIO(_resp))
-        # Normalize column names
         _renames = {"central_bank": "country", "speaker": "author", "is_governor": "is_gov"}
         _rename_map = {old: new for old, new in _renames.items() if old in _df.columns and new not in _df.columns}
         if _rename_map:
@@ -65,13 +80,16 @@ def _(io, mo, objects_api, pl):
 
     load_dataset = _load
 
-    dataset_dropdown
-    return dataset_dropdown, load_dataset
+    return DATASETS, dataset_dropdown, load_dataset
 
 
 @app.cell
-def _(dataset_dropdown, load_dataset):
-    df = load_dataset(dataset_dropdown.value)
+def _(dataset_dropdown, load_dataset, mo, pl):
+    if dataset_dropdown is None:
+        df = pl.DataFrame()
+        mo.md("_No dataset available._")
+    else:
+        df = load_dataset(dataset_dropdown.value)
     return (df,)
 
 
