@@ -71,14 +71,12 @@ def _(io, mo, objects_api, pl):
 
     if not DATASETS:
         dataset_dropdown = None
-        mo.callout("No datasets found in LakeFS.", kind="danger")
     else:
         dataset_dropdown = mo.ui.dropdown(
             options=list(DATASETS.keys()),
             value=list(DATASETS.keys())[0],
             label="Dataset",
         )
-        dataset_dropdown
 
     def _load(name):
         _path = DATASETS[name]
@@ -92,16 +90,16 @@ def _(io, mo, objects_api, pl):
 
     load_dataset = _load
 
+    # Top-level output: show dropdown or error
+    dataset_dropdown if dataset_dropdown is not None else mo.callout("No datasets found in LakeFS.", kind="danger")
+
     return DATASETS, dataset_dropdown, load_dataset
 
 
 @app.cell
 def _(dataset_dropdown, load_dataset, mo, pl):
-    if dataset_dropdown is None:
-        df = pl.DataFrame()
-        mo.md("_No dataset available._")
-    else:
-        df = load_dataset(dataset_dropdown.value)
+    mo.stop(dataset_dropdown is None, mo.md("_No dataset available._"))
+    df = load_dataset(dataset_dropdown.value)
     return (df,)
 
 
@@ -119,55 +117,57 @@ def _(df, mo):
 
 @app.cell
 def _(country_filter, df, mo, pl):
+    import altair as alt
+
     _df = df
     if country_filter.value:
         _df = _df.filter(pl.col("country").is_in(country_filter.value))
 
     _stance_cols = [c for c in ["monetary_stance", "trade_stance", "economic_outlook"] if c in _df.columns]
 
-    if not _stance_cols or "date" not in _df.columns:
-        mo.md("_Required columns (date, monetary_stance, trade_stance, economic_outlook) not found._")
-    else:
-        # Parse date and extract month
-        _df = _df.with_columns(pl.col("date").cast(pl.Date).alias("_date"))
-        _df = _df.with_columns(pl.col("_date").dt.truncate("1mo").alias("month"))
+    mo.stop(
+        not _stance_cols or "date" not in _df.columns,
+        mo.md("_Required columns (date, monetary_stance, trade_stance, economic_outlook) not found._"),
+    )
 
-        # Cast stance columns to float for averaging
-        for _c in _stance_cols:
-            _df = _df.with_columns(pl.col(_c).cast(pl.Float64))
+    # Parse date and extract month
+    _df = _df.with_columns(pl.col("date").cast(pl.Date).alias("_date"))
+    _df = _df.with_columns(pl.col("_date").dt.truncate("1mo").alias("month"))
 
-        # Monthly averages
-        _monthly = (
-            _df.group_by("month")
-            .agg([pl.col(c).mean().alias(c) for c in _stance_cols])
-            .sort("month")
-            .drop_nulls("month")
+    # Cast stance columns to float for averaging
+    for _c in _stance_cols:
+        _df = _df.with_columns(pl.col(_c).cast(pl.Float64))
+
+    # Monthly averages
+    _monthly = (
+        _df.group_by("month")
+        .agg([pl.col(c).mean().alias(c) for c in _stance_cols])
+        .sort("month")
+        .drop_nulls("month")
+    )
+
+    # Build Altair chart
+    _long = _monthly.unpivot(
+        index="month",
+        on=_stance_cols,
+        variable_name="metric",
+        value_name="score",
+    ).to_pandas()
+
+    _chart = (
+        alt.Chart(_long)
+        .mark_line(point=True)
+        .encode(
+            x=alt.X("month:T", title="Month"),
+            y=alt.Y("score:Q", title="Average Score (1-5)", scale=alt.Scale(domain=[1, 5])),
+            color=alt.Color("metric:N", title="Metric"),
+            tooltip=["month:T", "metric:N", alt.Tooltip("score:Q", format=".2f")],
         )
+        .properties(width=700, height=400, title="Monthly Stance Averages")
+        .interactive()
+    )
 
-        # Build Altair chart
-        import altair as alt
-
-        _long = _monthly.unpivot(
-            index="month",
-            on=_stance_cols,
-            variable_name="metric",
-            value_name="score",
-        ).to_pandas()
-
-        _chart = (
-            alt.Chart(_long)
-            .mark_line(point=True)
-            .encode(
-                x=alt.X("month:T", title="Month"),
-                y=alt.Y("score:Q", title="Average Score (1-5)", scale=alt.Scale(domain=[1, 5])),
-                color=alt.Color("metric:N", title="Metric"),
-                tooltip=["month:T", "metric:N", alt.Tooltip("score:Q", format=".2f")],
-            )
-            .properties(width=700, height=400, title="Monthly Stance Averages")
-            .interactive()
-        )
-
-        mo.ui.altair_chart(_chart)
+    mo.ui.altair_chart(_chart)
     return
 
 
