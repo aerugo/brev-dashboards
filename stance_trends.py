@@ -105,7 +105,7 @@ def _(dataset_dropdown, load_dataset, mo, pl):
 
 @app.cell
 def _(df, mo, pl):
-    _dates = df.with_columns(pl.col("date").cast(pl.Date)).get_column("date")
+    _dates = df.with_columns(pl.col("date").cast(pl.Date, strict=False)).drop_nulls("date").get_column("date")
     _min_year = _dates.min().year
     _max_year = _dates.max().year
 
@@ -138,7 +138,8 @@ def _(country_filter, df, mo, pl, year_slider):
     _df = df
 
     # Apply year filter
-    _df = _df.with_columns(pl.col("date").cast(pl.Date).alias("_date"))
+    _df = _df.with_columns(pl.col("date").cast(pl.Date, strict=False).alias("_date"))
+    _df = _df.drop_nulls("_date")
     _df = _df.filter(
         (pl.col("_date").dt.year() >= year_slider.value[0])
         & (pl.col("_date").dt.year() <= year_slider.value[1])
