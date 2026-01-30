@@ -1,3 +1,13 @@
+# /// script
+# requires-python = ">=3.10"
+# dependencies = [
+#     "marimo>=0.19.4",
+#     "polars>=1.0.0",
+#     "lakefs-sdk>=1.0.0",
+#     "altair>=5.0.0",
+#     "pandas",
+# ]
+# ///
 """Stance Trends Dashboard.
 
 Monthly averages of monetary_stance, trade_stance, and economic_outlook

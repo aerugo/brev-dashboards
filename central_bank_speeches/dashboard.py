@@ -1,3 +1,14 @@
+# /// script
+# requires-python = ">=3.10"
+# dependencies = [
+#     "marimo>=0.19.4",
+#     "polars>=1.0.0",
+#     "weaviate-client>=4.9.0",
+#     "lakefs-sdk>=1.0.0",
+#     "requests>=2.31.0",
+#     "pandas",
+# ]
+# ///
 """Central Bank Speeches Vector Search Dashboard.
 
 Interactive dashboard for exploring central bank speeches using semantic search.

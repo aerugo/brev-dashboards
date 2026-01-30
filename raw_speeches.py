@@ -1,3 +1,11 @@
+# /// script
+# requires-python = ">=3.10"
+# dependencies = [
+#     "marimo>=0.19.4",
+#     "polars>=1.0.0",
+#     "lakefs-sdk>=1.0.0",
+# ]
+# ///
 import marimo
 
 __generated_with = "0.19.5"
