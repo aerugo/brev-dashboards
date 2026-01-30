@@ -4,6 +4,8 @@
 #     "marimo>=0.19.4",
 #     "polars>=1.0.0",
 #     "lakefs-sdk>=1.0.0",
+#     "numpy",
+#     "pyarrow",
 # ]
 # ///
 import marimo

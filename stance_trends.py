@@ -6,6 +6,8 @@
 #     "lakefs-sdk>=1.0.0",
 #     "altair>=5.0.0",
 #     "pandas",
+#     "numpy",
+#     "pyarrow",
 # ]
 # ///
 """Stance Trends Dashboard.

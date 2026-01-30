@@ -7,6 +7,8 @@
 #     "lakefs-sdk>=1.0.0",
 #     "requests>=2.31.0",
 #     "pandas",
+#     "numpy",
+#     "pyarrow",
 # ]
 # ///
 """Central Bank Speeches Vector Search Dashboard.
